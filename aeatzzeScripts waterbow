@@ -1,0 +1,101 @@
+local toolId=236438668
+local Players=game:GetService("Players")
+local Debris=game:GetService("Debris")
+local UserInputService=game:GetService("UserInputService")
+local RunService=game:GetService("RunService")
+local player=Players.LocalPlayer
+local character=player.Character or player.CharacterAdded:Wait()
+local humanoid=character:WaitForChild("Humanoid")
+local mouse=player:GetMouse()
+local SHOT_SOUND_ID="rbxassetid://99204505"
+local HIT_SOUND_ID="rbxassetid://58274204"
+local function createWaterExplosion(point)
+local scale=8+(4*math.random(1,3))
+local terrain=workspace.Terrain
+terrain:FillBall(point,scale,Enum.Material.Water)
+task.delay(7,function() terrain:FillBall(point,scale,Enum.Material.Air) end)
+end
+local function createArrow()
+local arrow=Instance.new("Part")
+arrow.Name="SeaArrow"
+arrow.Size=Vector3.new(0.2,0.2,2.5)
+arrow.Transparency=0.25
+arrow.Reflectance=0.5
+arrow.CanCollide=false
+arrow.Anchored=false
+arrow.Material=Enum.Material.SmoothPlastic
+arrow.BrickColor=BrickColor.new("Cyan")
+local mesh=Instance.new("SpecialMesh")
+mesh.MeshId="rbxassetid://235107348"
+mesh.TextureId="rbxassetid://235107780"
+mesh.Scale=Vector3.new(1,1,1)
+mesh.Parent=arrow
+local hitSound=Instance.new("Sound")
+hitSound.Name="Hit"
+hitSound.SoundId=HIT_SOUND_ID
+hitSound.Volume=1
+hitSound.Parent=arrow
+return arrow
+end
+local success,objects=pcall(function() return game:GetObjects("rbxassetid://"..toolId) end)
+if not(success and objects and objects[1] and objects[1]:IsA("Tool")) then warn("Failed to load Crossbow of the Sea.") return end
+local tool=objects[1]
+tool.Name="Crossbow of the Sea"
+tool.Parent=player.Backpack
+humanoid:EquipTool(tool)
+for _,child in ipairs(tool:GetDescendants()) do if child:IsA("Script") or child:IsA("LocalScript") then child:Destroy() end end
+local handle=tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+if handle then
+local shotSound=Instance.new("Sound")
+shotSound.Name="Shot"
+shotSound.SoundId=SHOT_SOUND_ID
+shotSound.Volume=0.5
+shotSound.Parent=handle
+end
+local AttackAble=true
+local AttackReloadTime=1.2
+local ProjectileSpeed=120
+tool.Activated:Connect(function()
+if not AttackAble then return end
+AttackAble=false
+if handle and handle:FindFirstChild("Shot") then handle.Shot.Pitch=math.random(90,110)/100 handle.Shot:Play() end
+local targetPoint=mouse.Hit.Position
+local launchPoint=handle and handle.Position or character.PrimaryPart.Position
+local arrow=createArrow()
+arrow.CFrame=CFrame.new(launchPoint,targetPoint)
+arrow.Velocity=arrow.CFrame.LookVector*ProjectileSpeed
+arrow.Parent=workspace
+local connection
+connection=arrow.Touched:Connect(function(part)
+if part:IsDescendantOf(character) then return end
+createWaterExplosion(arrow.Position)
+if arrow:FindFirstChild("Hit") then arrow.Hit:Play() end
+arrow.Anchored=true
+arrow.CanCollide=false
+arrow.Transparency=1
+if connection then connection:Disconnect() end
+end)
+Debris:AddItem(arrow,8)
+task.delay(AttackReloadTime,function() AttackAble=true end)
+end)
+local JUMP_POWER=115
+local BOOST_FRAMES=12
+local function isInWater()
+local state=humanoid:GetState()
+return state==Enum.HumanoidStateType.Swimming or state==Enum.HumanoidStateType.GettingUp
+end
+UserInputService.JumpRequest:Connect(function()
+if not isInWater() then return end
+local root=character:FindFirstChild("HumanoidRootPart")
+if not root then return end
+humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+root.AssemblyLinearVelocity=Vector3.new(root.AssemblyLinearVelocity.X,JUMP_POWER,root.AssemblyLinearVelocity.Z)
+task.spawn(function()
+for i=1,BOOST_FRAMES do
+if not root or not root.Parent then break end
+if root.AssemblyLinearVelocity.Y<JUMP_POWER*0.7 then root.AssemblyLinearVelocity=Vector3.new(root.AssemblyLinearVelocity.X,math.max(root.AssemblyLinearVelocity.Y,JUMP_POWER*0.85),root.AssemblyLinearVelocity.Z) end
+RunService.Heartbeat:Wait()
+end
+end)
+end)
+print("Crossbow of the Sea ready!")
